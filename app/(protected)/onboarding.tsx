@@ -33,7 +33,7 @@ import PlanningStep from "@/components/onboarding/PlanningStep";
 import GoalsStep from "@/components/onboarding/GoalsStep";
 import PreferencesStep from "@/components/onboarding/PreferencesStep";
 import MealTypesStep from "@/components/onboarding/MealType";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 
 const { width, height } = Dimensions.get("window");
 

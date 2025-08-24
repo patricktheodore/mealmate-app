@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { SafeAreaView } from "@/components/safe-area-view";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 
 import { FormData } from "@/app/(protected)/onboarding";
 import type { Tag } from "@/types/database";

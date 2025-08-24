@@ -2,7 +2,7 @@ import { View, Pressable, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
 import { Image } from "@/components/image";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 import { getRecipeColorScheme } from "@/lib/colors";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
 import * as Haptics from 'expo-haptics';

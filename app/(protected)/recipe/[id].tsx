@@ -16,7 +16,7 @@ import { supabase } from "@/config/supabase";
 import { SafeAreaView } from "@/components/safe-area-view";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 import { getRecipeColorScheme } from "@/lib/colors";
 import { Instruction, RecipeIngredient, RecipeWithTags } from "@/types/database";
 

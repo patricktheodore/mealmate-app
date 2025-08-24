@@ -6,7 +6,7 @@ import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import { MealCard } from "./MealCard";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 import { MealPlanItem } from "@/types/database";
 
 export const MealPlanSection = () => {

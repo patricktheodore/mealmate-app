@@ -6,7 +6,7 @@ import Svg, { Text as SvgText } from "react-native-svg";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 
 import { FormData } from "@/app/(protected)/onboarding";
 import type { Tag, TagType } from "@/types/database";

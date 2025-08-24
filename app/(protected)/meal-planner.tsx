@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { useAppData } from "@/context/app-data-provider";
+import { useAppData } from "@/context/meal-plan-provider";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
 import { EditMealCard } from "@/components/home-screen/EditMealCard";
 
