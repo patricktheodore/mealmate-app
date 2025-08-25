@@ -2,11 +2,11 @@ import { View, Pressable, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
 import { Image } from "@/components/image";
-import { useAppData } from "@/context/meal-plan-provider";
 import { getRecipeColorScheme } from "@/lib/colors";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
 import * as Haptics from 'expo-haptics';
 import { MealPlanItem } from "@/types/database";
+import { useReferenceData } from "@/context/reference-data-provider";
 
 interface MealCardProps {
 	recipe: MealPlanItem;
@@ -19,15 +19,15 @@ interface MealCardProps {
 }
 
 export const MealCard = ({
-	recipe,
-	onPress,
-	onServingsChange,
-	width = 320,
-	variant = "horizontal",
-	showServingsEditor = false,
-	weekStatus = 'current',
+    recipe,
+    onPress,
+    onServingsChange,
+    width = 320,
+    variant = "horizontal",
+    showServingsEditor = false,
+    weekStatus = 'current',
 }: MealCardProps) => {
-	const { tags } = useAppData();
+	const { tags } = useReferenceData();
 	const colors = getRecipeColorScheme(recipe.recipe.tagIds, tags);
 	
 	const buttonPress = usePressAnimation({

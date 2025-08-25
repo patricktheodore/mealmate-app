@@ -6,8 +6,9 @@ import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import { MealCard } from "./MealCard";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
-import { useAppData } from "@/context/meal-plan-provider";
 import { MealPlanItem } from "@/types/database";
+import { useMealPlan } from "@/context/meal-plan-provider";
+import { useWeeks } from "@/context/week-data-provider";
 
 export const MealPlanSection = () => {
 	const router = useRouter();
@@ -15,17 +16,18 @@ export const MealPlanSection = () => {
 
 	const {
 		currentMealPlan,
-		weeks,
-		currentWeek,
-		loading,
-		error,
+		loading: mealPlanLoading,
+		error: mealPlanError,
 		getCurrentMealPlan,
 		generateInitialMealPlan,
 		updateMealServings,
-		getWeekById,
-		getWeeksRange,
 		loadMealPlanForWeek,
-	} = useAppData();
+	} = useMealPlan();
+
+	const { weeks, currentWeek, getWeekById, getWeeksRange } = useWeeks();
+
+	const loading = mealPlanLoading;
+	const error = mealPlanError;
 
 	const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
 	const [isLoadingWeekPlan, setIsLoadingWeekPlan] = useState(false);
@@ -50,39 +52,42 @@ export const MealPlanSection = () => {
 		router.push(`/recipe/${meal.recipe.id}`);
 	};
 
-	const handleWeekPress = useCallback(async (weekId: string) => {
-		if (weekId === selectedWeekId) return;
-		
-		setSelectedWeekId(weekId);
-		setIsLoadingWeekPlan(true);
-		
-		try {
-			await loadMealPlanForWeek(weekId);
-		} catch (error) {
-			console.error("Error loading meal plan for week:", error);
-		} finally {
-			setIsLoadingWeekPlan(false);
-		}
-	}, [selectedWeekId, loadMealPlanForWeek]);
+	const handleWeekPress = useCallback(
+		async (weekId: string) => {
+			if (weekId === selectedWeekId) return;
+
+			setSelectedWeekId(weekId);
+			setIsLoadingWeekPlan(true);
+
+			try {
+				await loadMealPlanForWeek(weekId); // This method is from useMealPlan()
+			} catch (error) {
+				console.error("Error loading meal plan for week:", error);
+			} finally {
+				setIsLoadingWeekPlan(false);
+			}
+		},
+		[selectedWeekId, loadMealPlanForWeek],
+	);
 
 	const handleEditMeals = () => {
-		const selectedWeek = getWeekById(selectedWeekId!);
+		const selectedWeek = getWeekById(selectedWeekId!); // This method is from useWeeks()
 		if (!selectedWeek) return;
 
 		router.push({
-			pathname: '/meal-planner',
+			pathname: "/meal-planner",
 			params: {
 				weekId: selectedWeek.id,
 				weekStart: selectedWeek.start_date,
 				weekEnd: selectedWeek.end_date,
 				displayRange: selectedWeek.display_range,
-			}
+			},
 		});
 	};
 
 	const handleGenerateNewPlan = async () => {
 		try {
-			await generateInitialMealPlan();
+			await generateInitialMealPlan(); // This method is from useMealPlan()
 		} catch (error) {
 			console.error("Error generating new meal plan:", error);
 		}
@@ -90,7 +95,10 @@ export const MealPlanSection = () => {
 
 	const displayMeals = getCurrentMealPlan();
 	const selectedWeek = selectedWeekId ? getWeekById(selectedWeekId) : null;
-	const totalServings = displayMeals.reduce((sum, meal) => sum + meal.servings, 0);
+	const totalServings = displayMeals.reduce(
+		(sum, meal) => sum + meal.servings,
+		0,
+	);
 
 	const StickyCalendarSection = useMemo(
 		() => (
@@ -121,8 +129,10 @@ export const MealPlanSection = () => {
 								style={{
 									backgroundColor:
 										week.id === selectedWeekId ? "#CCEA1F" : "#FFFFFF",
-									borderColor: week.id === selectedWeekId ? "#25551b" : "#E2E2E2",
-									shadowColor: week.id === selectedWeekId ? "#25551b" : "#E2E2E2",
+									borderColor:
+										week.id === selectedWeekId ? "#25551b" : "#E2E2E2",
+									shadowColor:
+										week.id === selectedWeekId ? "#25551b" : "#E2E2E2",
 								}}
 								className="py-4 px-4 border-2 rounded-xl items-center min-w-[100px] shadow-[0px_2px_0px_0px] active:shadow-[0px_0px_0px_0px] active:translate-y-[2px]"
 							>
@@ -398,7 +408,7 @@ export const MealPlanSection = () => {
 								? "Let's create your first meal plan!"
 								: "Start planning meals for this week"}
 						</Text>
-						
+
 						{selectedWeek?.is_current_week && (
 							<Button
 								onPress={handleGenerateNewPlan}
@@ -418,7 +428,7 @@ export const MealPlanSection = () => {
 				{selectedWeek && (
 					<View className="px-4 flex-1 gap-4 mt-6">
 						{/* Edit meals button - for current and future weeks */}
-						{selectedWeek.status !== 'past' && (
+						{selectedWeek.status !== "past" && (
 							<Button
 								variant="outline"
 								accessibilityRole="button"
@@ -428,10 +438,10 @@ export const MealPlanSection = () => {
 								onPress={handleEditMeals}
 								{...buttonPress}
 							>
-                                <Text className="uppercase">Change meals</Text>
+								<Text className="uppercase">Change meals</Text>
 							</Button>
 						)}
-						
+
 						{/* Add to cart button - only for current week */}
 						{selectedWeek.is_current_week && displayMeals.length > 0 && (
 							<Button
@@ -441,7 +451,7 @@ export const MealPlanSection = () => {
 								accessibilityHint="Add ingredients for the selected meals to your cart"
 								{...buttonPress}
 							>
-                                <Text>Confirm</Text>
+								<Text>Confirm</Text>
 							</Button>
 						)}
 					</View>

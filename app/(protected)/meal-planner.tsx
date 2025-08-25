@@ -4,37 +4,61 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { useAppData } from "@/context/meal-plan-provider";
 import { usePressAnimation } from "@/hooks/onPressAnimation";
 import { EditMealCard } from "@/components/home-screen/EditMealCard";
+import { useMealPlan } from "@/context/meal-plan-provider";
+import { useWeeks } from "@/context/week-data-provider";
+import { useRecipes } from "@/context/recipe-data-provider";
+import { MealPlanItem, RecipeWithTags } from "@/types/database";
 
 export default function MealPlannerScreen() {
 	const router = useRouter();
 	const params = useLocalSearchParams();
 	const { weekId, weekStart, weekEnd, displayRange } = params;
-	
+
 	const {
 		currentMealPlan,
-		filteredRecipes,
-		getWeekById,
-		loading,
-		error
-	} = useAppData();
-	
+		loading: mealPlanLoading,
+		error: mealPlanError,
+		saveMealPlanForWeek,
+		loadMealPlanForWeek,
+		getAvailableRecipes,
+		addMealToPlan,
+		removeMealFromPlan,
+		updateMealServings,
+	} = useMealPlan();
+
+	const { getWeekById } = useWeeks();
+	const { recipes } = useRecipes();
+
+	// Combine loading states
+	const loading = mealPlanLoading;
+	const error = mealPlanError;
+
 	const buttonPress = usePressAnimation({
 		hapticStyle: "Medium",
 		pressDistance: 4,
 	});
-	
-	const selectedWeek = weekId ? getWeekById(weekId as string) : null;
 
-	const [selectedMeals, setSelectedMeals] = useState(currentMealPlan);
+	const selectedWeek = weekId ? getWeekById(weekId as string) : null;
+	const availableRecipes = getAvailableRecipes();
+
+	const [selectedMeals, setSelectedMeals] = useState<MealPlanItem[]>(currentMealPlan);
 	const [hasChanges, setHasChanges] = useState(false);
-	
+
+	useEffect(() => {
+
+		if (weekId) {
+			loadMealPlanForWeek(weekId as string).then(() => {
+				// Meal plan loaded, it will update currentMealPlan
+			});
+		}
+	}, [weekId, loadMealPlanForWeek]);
+
 	useEffect(() => {
 		setSelectedMeals(currentMealPlan);
 	}, [currentMealPlan]);
-	
+
 	const handleBack = () => {
 		if (hasChanges) {
 			// TODO: Add confirmation dialog
@@ -43,11 +67,19 @@ export default function MealPlannerScreen() {
 			router.back();
 		}
 	};
-	
-	const handleSaveChanges = () => {
-		// TODO: Save changes to database
-		console.log("Saving changes for week:", weekId);
-		router.back();
+
+	const handleSaveChanges = async () => {
+		if (!weekId) return;
+
+		try {
+			// Use the provider method to save
+			await saveMealPlanForWeek(weekId as string, selectedMeals);
+			console.log("Saved changes for week:", weekId);
+			router.back();
+		} catch (error) {
+			console.error("Error saving meal plan:", error);
+			// Handle error - maybe show an alert
+		}
 	};
 
 	const handleSwapMeal = (mealId: string) => {
@@ -57,32 +89,38 @@ export default function MealPlannerScreen() {
 	};
 
 	const handleRemoveMeal = (mealId: string) => {
-		setSelectedMeals(prev => prev.filter(meal => meal.id !== mealId));
+		// Update local state
+		setSelectedMeals((prev) => prev.filter((meal) => meal.id !== mealId));
 		setHasChanges(true);
+
+		// Optionally update the provider's current meal plan
+		removeMealFromPlan(mealId);
 	};
 
-	const handleAddMeal = (recipe: any) => {
-		// Check if meal is already selected to prevent duplicates
-		if (selectedMeals.some(meal => meal.id === recipe.id)) {
+	const handleAddMeal = (recipe: RecipeWithTags) => {
+		// Check if meal is already selected
+		if (selectedMeals.some((meal) => meal.recipe.id === recipe.id)) {
 			return;
 		}
-		
-		// Add recipe with default servings of 1
-		setSelectedMeals(prev => [...prev, { ...recipe, servings: 1 }]);
+
+		// Create a meal plan item from the recipe
+		const newMeal: MealPlanItem = {
+			id: `meal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+			recipe,
+			servings: 1,
+		};
+
+		setSelectedMeals((prev) => [...prev, newMeal]);
 		setHasChanges(true);
 	};
 
 	const handleServingsChange = (mealId: string, servings: number) => {
-		setSelectedMeals(prev => 
-			prev.map(meal => 
-				meal.id === mealId 
-					? { ...meal, servings }
-					: meal
-			)
+		setSelectedMeals((prev) =>
+			prev.map((meal) => (meal.id === mealId ? { ...meal, servings } : meal)),
 		);
 		setHasChanges(true);
 	};
-	
+
 	if (loading) {
 		return (
 			<SafeAreaView className="flex-1 bg-background">
@@ -94,7 +132,7 @@ export default function MealPlannerScreen() {
 			</SafeAreaView>
 		);
 	}
-	
+
 	if (error) {
 		return (
 			<SafeAreaView className="flex-1 bg-background">
@@ -122,7 +160,7 @@ export default function MealPlannerScreen() {
 			</SafeAreaView>
 		);
 	}
-	
+
 	return (
 		<SafeAreaView className="flex-1 bg-white">
 			<View className="bg-white border-b border-gray-200">
@@ -134,27 +172,27 @@ export default function MealPlannerScreen() {
 					>
 						<Ionicons name="arrow-back" size={24} color="#374151" />
 					</TouchableOpacity>
-					
+
 					<Text className="text-lg font-montserrat-bold text-gray-900">
 						Swap Meals
 					</Text>
-					
+
 					<TouchableOpacity
 						onPress={handleSaveChanges}
 						disabled={!hasChanges}
 						className="p-2"
 						{...buttonPress}
 					>
-						<Text 
+						<Text
 							className={`font-montserrat-semibold ${
-								hasChanges ? 'text-primary' : 'text-gray-400'
+								hasChanges ? "text-primary" : "text-gray-400"
 							}`}
 						>
 							Save
 						</Text>
 					</TouchableOpacity>
 				</View>
-				
+
 				<View className="px-4 pb-4">
 					<View
 						style={{
@@ -166,13 +204,13 @@ export default function MealPlannerScreen() {
 					>
 						<View className="flex-row items-center justify-between">
 							<View>
-								<Text 
+								<Text
 									className="text-xs font-montserrat-bold mb-1"
 									style={{ color: "#25551b" }}
 								>
-									{selectedWeek?.displayTitle || 'Selected Week'}
+									{selectedWeek?.displayTitle || "Selected Week"}
 								</Text>
-								<Text 
+								<Text
 									className="text-lg font-montserrat-semibold"
 									style={{ color: "#25551b" }}
 								>
@@ -188,16 +226,13 @@ export default function MealPlannerScreen() {
 					</View>
 				</View>
 			</View>
-			
-			<ScrollView 
-				className="flex-1"
-				showsVerticalScrollIndicator={false}
-			>
+
+			<ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
 				<View className="px-4 pt-4">
 					<Text className="text-lg font-montserrat-bold text-gray-900 mb-3">
 						Your Selected Meals ({selectedMeals.length})
 					</Text>
-					
+
 					{selectedMeals.length > 0 ? (
 						<View className="flex flex-col gap-2">
 							{selectedMeals.map((meal) => (
@@ -222,62 +257,43 @@ export default function MealPlannerScreen() {
 						</View>
 					)}
 				</View>
-				
+
 				{/* Divider */}
 				<View className="h-px bg-gray-200 mx-4 my-6" />
-				
+
 				{/* Available Recipes Section */}
 				<View className="px-4 pb-6">
 					<Text className="text-lg font-montserrat-bold text-gray-900 mb-3">
-						Available Recipes ({filteredRecipes.length})
+						Available Recipes ({availableRecipes.length})
 					</Text>
-					
-					{filteredRecipes.length > 0 ? (
+
+					{availableRecipes.length > 0 ? (
 						<View className="flex flex-col gap-2">
-							{filteredRecipes
-								.filter(recipe => !selectedMeals.some(meal => meal.id === recipe.id))
-								.map((recipe) => (
+							{availableRecipes.map((recipe) => (
 								<TouchableOpacity
 									key={recipe.id}
 									onPress={() => handleAddMeal(recipe)}
 									{...buttonPress}
 								>
-                                    {/* TODO: New card type here */}
-									{/* <EditMealCard
-										meal={recipe}
-										variant="compact"
-										showActions={false}
-										showAddButton={true}
-									/> */}
+									{/* Render recipe card here */}
+									{/* Note: EditMealCard expects a meal, not a recipe */}
 								</TouchableOpacity>
 							))}
-							
-							{filteredRecipes.filter(recipe => !selectedMeals.some(meal => meal.id === recipe.id)).length === 0 && (
-								<View className="bg-gray-50 rounded-xl p-6 items-center">
-									<Ionicons name="checkmark-circle" size={48} color="#10B981" />
-									<Text className="text-gray-600 font-montserrat-semibold mt-3">
-										All recipes added!
-									</Text>
-									<Text className="text-gray-500 text-sm mt-1 text-center">
-										You've selected all available recipes for this week
-									</Text>
-								</View>
-							)}
 						</View>
 					) : (
 						<View className="bg-gray-50 rounded-xl p-6 items-center">
-							<Ionicons name="restaurant-outline" size={48} color="#9CA3AF" />
+							<Ionicons name="checkmark-circle" size={48} color="#10B981" />
 							<Text className="text-gray-600 font-montserrat-semibold mt-3">
-								No recipes available
+								All recipes added!
 							</Text>
 							<Text className="text-gray-500 text-sm mt-1 text-center">
-								Check back later for new recipes
+								You've selected all available recipes for this week
 							</Text>
 						</View>
 					)}
 				</View>
 			</ScrollView>
-			
+
 			<View className="bg-white border-t border-gray-200 px-4 py-3">
 				<View className="flex-row gap-3">
 					<Button
@@ -294,9 +310,7 @@ export default function MealPlannerScreen() {
 						onPress={handleSaveChanges}
 						{...buttonPress}
 					>
-						<Text className="font-montserrat-semibold">
-							Save Changes
-						</Text>
+						<Text className="font-montserrat-semibold">Save Changes</Text>
 					</Button>
 				</View>
 			</View>
