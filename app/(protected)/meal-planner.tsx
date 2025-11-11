@@ -1,21 +1,22 @@
-import { View, ScrollView, TouchableOpacity, SafeAreaView } from "react-native";
+import { View, ScrollView, Pressable } from "react-native";
+import { SafeAreaView } from "@/components/safe-area-view";
 import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { usePressAnimation } from "@/hooks/onPressAnimation";
-import { EditMealCard } from "@/components/home-screen/EditMealCard";
 import { useMealPlan } from "@/context/meal-plan-provider";
 import { useWeeks } from "@/context/week-data-provider";
-import { useRecipes } from "@/context/recipe-data-provider";
 import { MealPlanItem, RecipeWithTags } from "@/types/database";
 import { MealCard } from "@/components/home-screen/MealCard";
+import * as Haptics from "expo-haptics";
+import { MealExplorer } from "@/components/meal-explorer/meal-explorer";
+import { useUserPreferences } from "@/context/user-preferences-provider";
 
 export default function MealPlannerScreen() {
 	const router = useRouter();
 	const params = useLocalSearchParams();
-	const { weekId, displayRange } = params;
+	const { weekId } = params;
 
 	const {
 		currentMealPlan,
@@ -24,27 +25,21 @@ export default function MealPlannerScreen() {
 		saveMealPlanForWeek,
 		loadMealPlanForWeek,
 		getAvailableRecipes,
-		addMealToPlan,
-		removeMealFromPlan,
-		updateMealServings,
-		regenerateMealPlan,
 	} = useMealPlan();
+
+    const {
+        preferences
+    } = useUserPreferences();
 
 	const { getWeekById } = useWeeks();
 
 	const loading = mealPlanLoading;
 	const error = mealPlanError;
-
-	const buttonPress = usePressAnimation({
-		hapticStyle: "Medium",
-		pressDistance: 4,
-	});
-
 	const selectedWeek = weekId ? getWeekById(weekId as string) : null;
 	const availableRecipes = getAvailableRecipes();
 
-	const [selectedMeals, setSelectedMeals] =
-		useState<MealPlanItem[]>(currentMealPlan);
+	const [originalMealPlan, setOriginalMealPlan] = useState<MealPlanItem[]>([]);
+	const [selectedMeals, setSelectedMeals] = useState<MealPlanItem[]>([]);
 	const [hasChanges, setHasChanges] = useState(false);
 
 	useEffect(() => {
@@ -57,81 +52,70 @@ export default function MealPlannerScreen() {
 		}
 	}, [weekId]);
 
-	useEffect(() => {
-		setSelectedMeals(currentMealPlan);
-		// Reset hasChanges when we get a fresh meal plan
+    useEffect(() => {
+		const clonedMealPlan = currentMealPlan.map(meal => ({
+			...meal,
+			recipe: { ...meal.recipe }
+		}));
+		
+		setOriginalMealPlan(clonedMealPlan);
+		setSelectedMeals(clonedMealPlan);
 		setHasChanges(false);
 	}, [currentMealPlan]);
 
-	const handleBack = () => {
+    const handleBack = () => {
 		if (hasChanges) {
-			// TODO: Add confirmation dialog
-			router.back();
-		} else {
-			router.back();
-		}
-	};
-
-	const handleSaveChanges = async () => {
-		if (!weekId) return;
-
-		try {
-			// Use the provider method to save
-			await saveMealPlanForWeek(weekId as string, selectedMeals);
-			console.log("Saved changes for week:", weekId);
+			setSelectedMeals([...originalMealPlan]);
 			setHasChanges(false);
-			router.back();
-		} catch (error) {
-			console.error("Error saving meal plan:", error);
-			// Handle error - maybe show an alert
 		}
+		router.back();
 	};
 
-	const handleRegeneratePlan = async () => {
-		if (!weekId) return;
-
-		try {
-			// This will regenerate and auto-save
-			await regenerateMealPlan(weekId as string);
-			setHasChanges(false); // Reset since we have a fresh saved plan
-		} catch (error) {
-			console.error("Error regenerating meal plan:", error);
-		}
+    const handleCancel = () => {
+		setSelectedMeals([...originalMealPlan]);
+		setHasChanges(false);
+		router.back();
 	};
 
-	const handleSwapMeal = (mealId: string) => {
-		// TODO: Implement meal swapping logic
-		console.log("Swapping meal:", mealId);
-		setHasChanges(true);
-	};
+    const handleSaveChanges = async () => {
+        if (!weekId) return;
 
-	const handleRemoveMeal = (mealId: string) => {
-		// Update local state
+        try {
+            await saveMealPlanForWeek(weekId as string, selectedMeals);
+            console.log("Saved changes for week:", weekId);
+            
+            // Reload the meal plan to sync local state with database
+            await loadMealPlanForWeek(weekId as string);
+            
+            setHasChanges(false);
+            setOriginalMealPlan([...selectedMeals]);
+            router.back();
+        } catch (error) {
+            console.error("Error saving meal plan:", error);
+        }
+    };
+
+    const handleRemoveMeal = (mealId: string) => {
 		setSelectedMeals((prev) => prev.filter((meal) => meal.id !== mealId));
 		setHasChanges(true);
-
-		// Optionally update the provider's current meal plan
-		removeMealFromPlan(mealId);
 	};
 
-	const handleAddMeal = (recipe: RecipeWithTags) => {
-		// Check if meal is already selected
+    const handleAddMeal = (recipe: RecipeWithTags) => {
 		if (selectedMeals.some((meal) => meal.recipe.id === recipe.id)) {
 			return;
 		}
 
-		// Create a meal plan item from the recipe
 		const newMeal: MealPlanItem = {
-			id: `meal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+			id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
 			recipe,
-			servings: 1,
+			servings: preferences?.serves_per_meal ?? 1,
 		};
 
 		setSelectedMeals((prev) => [...prev, newMeal]);
 		setHasChanges(true);
 	};
 
-	const handleServingsChange = (mealId: string, servings: number) => {
+    const handleServingsChange = (mealId: string, servings: number) => {
 		setSelectedMeals((prev) =>
 			prev.map((meal) => (meal.id === mealId ? { ...meal, servings } : meal)),
 		);
@@ -165,9 +149,9 @@ export default function MealPlannerScreen() {
 					</Text>
 					<Button
 						onPress={handleBack}
+						onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)}
 						variant="outline"
 						className="border-[#FF6525]"
-						{...buttonPress}
 					>
 						<Text className="text-[#FF6525] font-montserrat-semibold">
 							Go Back
@@ -182,32 +166,31 @@ export default function MealPlannerScreen() {
 		<SafeAreaView className="flex-1 bg-white">
 			<View className="bg-white border-b-2 border-b-[#EBEBEB]">
 				<View className="flex-row items-center justify-between px-4 py-3">
-					<TouchableOpacity
+					<Pressable
 						onPress={handleBack}
+                        onPressIn={() => {Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)}}
 						className="p-2"
-						{...buttonPress}
 					>
 						<Ionicons name="arrow-back" size={24} color="#1f2937" />
-					</TouchableOpacity>
+					</Pressable>
 
 					<Text className="text-lg font-montserrat-bold text-gray-800 uppercase tracking-wide">
 						Edit: {selectedWeek?.displayTitle || "Week"}
 					</Text>
 
-					<TouchableOpacity
+					<Pressable
 						onPress={handleSaveChanges}
+                        onPressIn={() => {Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)}}
 						disabled={!hasChanges}
 						className="p-2"
-						{...buttonPress}
 					>
-						<Text
-							className="font-montserrat-semibold uppercase text-gray-800"
-						>
+						<Text className="font-montserrat-semibold uppercase text-gray-800">
 							Save
 						</Text>
-					</TouchableOpacity>
+					</Pressable>
 				</View>
 
+{/*                 
 				<View className="flex-row justify-center items-center px-12 pb-3">
 					<View className="flex-1 flex-row justify-between items-center">
 						<View className="items-center">
@@ -291,7 +274,7 @@ export default function MealPlannerScreen() {
 									justifyContent: "center",
 								}}
 							>
-								<Ionicons name="star-outline" size={14} color="#9CA3AF" />
+								<Ionicons name="thumbs-up-outline" size={14} color="#9CA3AF" />
 							</View>
 							<Text
 								className="text-xs mt-1 font-montserrat-semibold uppercase"
@@ -301,28 +284,30 @@ export default function MealPlannerScreen() {
 							</Text>
 						</View>
 					</View>
-				</View>
+				</View> */}
 			</View>
 
 			<ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
 				<View className="px-4 pt-4">
-					<Text className="text-lg font-montserrat-bold text-gray-900 mb-3">
-						Your Selected Meals ({selectedMeals.length})
-					</Text>
+					<View className="flex-row items-center justify-between mb-3">
+						<Text className="text-lg font-montserrat-bold text-gray-900">
+							Your Selected Meals ({selectedMeals.length})
+						</Text>
+					</View>
 
 					{selectedMeals.length > 0 ? (
 						<View className="flex flex-col gap-2">
 							{selectedMeals.map((meal) => (
-                                <MealCard
-                                    key={meal.id}
-                                    recipe={meal}
-                                    editable={true}
-                                    isInPlan={true}
-                                    onRemove={handleRemoveMeal}
-                                    onServingsChange={handleServingsChange}
-                                    onPress={() => router.push(`/recipe/${meal.recipe.id}`)}
-                                />
-                            ))}
+								<MealCard
+									key={meal.id}
+									recipe={meal}
+									editable={true}
+									isInPlan={true}
+                                    isCollapsed={true}
+									onRemove={handleRemoveMeal}
+									onPress={() => router.push(`/recipe/${meal.recipe.id}`)}
+								/>
+							))}
 						</View>
 					) : (
 						<View className="bg-gray-50 rounded-xl p-6 items-center">
@@ -337,37 +322,13 @@ export default function MealPlannerScreen() {
 					)}
 				</View>
 
-				{/* Divider */}
 				<View className="h-px bg-gray-200 mx-4 my-6" />
 
-				{/* Available Recipes Section */}
-				<View className="px-4 pb-6">
-					<Text className="text-lg font-montserrat-bold text-gray-900 mb-3">
-						Available Recipes ({availableRecipes.length})
-					</Text>
-
-					<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {availableRecipes.map((recipe) => {
-                            const tempMeal: MealPlanItem = {
-                                id: recipe.id,
-                                recipe: recipe,
-                                servings: 1
-                            };
-                            
-                            return (
-                                <MealCard
-                                    key={recipe.id}
-                                    recipe={tempMeal}
-                                    editable={true}
-                                    isInPlan={false}
-                                    onAdd={() => handleAddMeal(recipe)}
-                                    width={350}
-                                    onPress={() => router.push(`/recipe/${recipe.id}`)}
-                                />
-                            );
-                        })}
-                    </ScrollView>
-				</View>
+				<MealExplorer 
+                    availableRecipes={availableRecipes}
+                    selectedMeals={selectedMeals}
+                    onAddMeal={handleAddMeal}
+                />
 			</ScrollView>
 
 			<View className="bg-white border-t border-gray-200 px-4 py-3">
@@ -375,8 +336,8 @@ export default function MealPlannerScreen() {
 					<Button
 						variant="outline"
 						className="flex-1"
-						onPress={handleBack}
-						{...buttonPress}
+						onPress={handleCancel}
+                        onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)}
 					>
 						<Text className="font-montserrat-semibold">Cancel</Text>
 					</Button>
@@ -384,7 +345,8 @@ export default function MealPlannerScreen() {
 						variant="default"
 						className="flex-1"
 						onPress={handleSaveChanges}
-						{...buttonPress}
+						onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)}
+                        disabled={!hasChanges}
 					>
 						<Text className="font-montserrat-semibold">Save Changes</Text>
 					</Button>

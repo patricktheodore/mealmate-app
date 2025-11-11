@@ -18,6 +18,8 @@ export type RecipeTag = Database['public']['Tables']['recipe_tags']['Row'];
 export type RecipeIngredient = Database['public']['Tables']['recipe_ingredients']['Row'];
 export type RecipeEquipment = Database['public']['Tables']['recipe_equipment']['Row'];
 export type Instruction = Database['public']['Tables']['instructions']['Row'];
+export type UserSavedRecipe = Database['public']['Tables']['user_saved_recipes']['Row'];
+export type UserRecipeRatings = Database['public']['Tables']['user_recipe_ratings']['Row'];
 
 // ============================================
 // Insert Types (for creating new records)
@@ -29,6 +31,8 @@ export type WeekInsert = Database['public']['Tables']['weeks']['Insert'];
 export type TagInsert = Database['public']['Tables']['tags']['Insert'];
 export type UserPreferencesInsert = Database['public']['Tables']['user_preferences']['Insert'];
 export type UserPreferenceTagInsert = Database['public']['Tables']['user_preference_tags']['Insert'];
+export type UserSavedRecipeInsert = Database['public']['Tables']['user_saved_recipes']['Insert'];
+export type UserRecipeRatingsInsert = Database['public']['Tables']['user_recipe_ratings']['Insert'];
 
 // ============================================
 // Update Types (for updating existing records)
@@ -38,6 +42,8 @@ export type RecipeUpdate = Database['public']['Tables']['recipe']['Update'];
 export type UserMealPlanUpdate = Database['public']['Tables']['user_meal_plans']['Update'];
 export type WeekUpdate = Database['public']['Tables']['weeks']['Update'];
 export type UserPreferencesUpdate = Database['public']['Tables']['user_preferences']['Update'];
+export type UserSavedRecipeUpdate = Database['public']['Tables']['user_saved_recipes']['Update'];
+export type UserRecipeRatingsUpdate = Database['public']['Tables']['user_recipe_ratings']['Update'];
 
 // ============================================
 // Function Return Types
@@ -122,4 +128,8 @@ export function isRecipe(obj: any): obj is Recipe {
 
 export function isUserMealPlan(obj: any): obj is UserMealPlan {
     return obj && typeof obj.recipe_id === 'string' && typeof obj.week_id === 'string';
+}
+
+export function isUserSavedRecipe(obj: any): obj is UserSavedRecipe {
+    return obj && typeof obj.user_id === 'string' && typeof obj.recipe_id === 'string';
 }
