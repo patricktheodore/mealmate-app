@@ -277,10 +277,28 @@ export function ReferenceDataProvider({ children }: PropsWithChildren) {
 		[units],
 	);
 
-	// Initialize on mount
 	useEffect(() => {
-		refreshAll();
-	}, []);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (event, session) => {
+                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                    if (session) {
+                        refreshAll();
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    // Clear reference data on sign out
+                    setTags([]);
+                    setIngredients([]);
+                    setEquipment([]);
+                    setUnits([]);
+                }
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
+        
+    }, [refreshAll]);
 
 	return (
 		<ReferenceDataContext.Provider

@@ -187,10 +187,26 @@ export function WeeksProvider({ children }: PropsWithChildren) {
 	);
 
 	useEffect(() => {
-		if (!initialized) {
-			fetchWeeks();
-		}
-	}, [initialized, fetchWeeks]);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (event, session) => {
+                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                    if (session) {
+                        fetchWeeks();
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    // Clear weeks data on sign out
+                    setWeeks([]);
+                    setCurrentWeek(null);
+                    setInitialized(false);
+                }
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
+        
+    }, [fetchWeeks]);
 
 	const contextValue = useMemo(
 		() => ({
